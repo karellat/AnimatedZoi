@@ -9,4 +9,4 @@ run: build
 term: 
 	sudo docker container exec -it animated /bin/sh
 test:
-	curl -v -F "motion_id=2" -F "char_cfg=@example/char_cfg.yaml" -F "image=@example/texture.png" -o 'example.gif' http://localhost:8000/render 
+	curl -v -F "motion_id=1" -F "char_cfg=@example/char_cfg.yaml" -F "image=@example/texture.png" -o 'example.gif' http://localhost:8000/render 

@@ -2,6 +2,11 @@ server {
     listen       80;
     server_name  localhost;
     client_max_body_size 40M;
+    keepalive_timeout  65;
+    client_header_timeout 1600;
+    client_body_timeout 1600;
+    send_timeout 1600;
+    proxy_read_timeout 1600;
     location / {
         proxy_pass   http://frontend:3000;
     }
