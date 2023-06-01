@@ -1,0 +1,39 @@
+services:
+  backend:
+    build: backend
+    ports:
+      - 8080:8080
+      - 8081:8081
+    networks:
+        default:
+          aliases:
+            - backend
+
+  proxy:
+    build: proxy
+    restart: always
+    ports:
+      - 80:80
+    depends_on: 
+      - backend
+    networks:
+        default:
+          aliases:
+            - proxy
+
+  frontend:
+    build: frontend
+    ports:
+      - 3000:3000
+    networks:
+        default:
+          aliases:
+            - frontend
+  render: 
+    build: render
+    ports:
+      - 8000:8000
+    networks:
+        default:
+          aliases:
+            - render

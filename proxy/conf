@@ -1,0 +1,18 @@
+server {
+    listen       80;
+    server_name  localhost;
+    client_max_body_size 40M;
+    location / {
+        proxy_pass   http://frontend:3000;
+    }
+    location /prediction {
+        proxy_pass   http://backend:8080;
+    }
+    location /ping {
+        proxy_pass  http://backend:8080;
+    }
+    location /render {
+        proxy_pass http://render:8000;
+    }
+
+}
