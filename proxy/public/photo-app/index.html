@@ -6,6 +6,8 @@
     <link rel="stylesheet" href="../style.css">
     <script src="../alpine.js" defer></script>
 <script>
+const backend = "http://localhost";
+
 function fileInputToPng(file) {
     // if the file is image/png, we could return it
     // but we want to resize it to 1000px
@@ -14,7 +16,7 @@ function fileInputToPng(file) {
     }
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    const canvas = document.createElement('canvas');
+    const canvas = document.querySelector('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
     return new Promise(resolve => {
@@ -38,7 +40,7 @@ function crop(file, bbox) {
     const [l, t, r, b] = bbox;
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    const canvas = document.createElement('canvas');
+    const canvas = document.querySelector('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
     return new Promise(resolve => {
@@ -47,7 +49,8 @@ function crop(file, bbox) {
             img.onload = () => {
                 canvas.width = r - l
                 canvas.height = b - t
-                ctx.drawImage(img, l, t, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+                const scale = Math.max(img.width / 1000, img.height / 1000, 1.0);
+                ctx.drawImage(img, l * scale, t * scale, canvas.width * scale, canvas.height * scale, 0, 0, canvas.width, canvas.height);
                 // convert to png
                 canvas.toBlob(blob => {
                     resolve(blob);
@@ -57,26 +60,66 @@ function crop(file, bbox) {
     });
 }
 
-async function formFetch(model, file) {
+function poseToYaml(pose) {
+    const mapping = {'torso': [1, 'hip'], 'neck': [0, 'torso'], 'right_shoulder': [6, 'torso'], 'right_elbow': [8, 'right_shoulder'], 'right_hand': [10, 'right_elbow'], 'left_shoulder': [5, 'torso'], 'left_elbow': [7, 'left_shoulder'], 'left_hand': [9, 'left_elbow'], 'right_hip': [12, 'root'], 'right_knee': [14, 'right_hip'], 'right_foot': [16, 'right_knee'], 'left_hip': [11, 'root'], 'left_knee': [13, 'left_hip'], 'left_foot': [15, 'left_knee']}
+    const yaml = []
+    const height = Math.ceil(Math.max(...pose.map(k => k[1])))
+    const width = Math.ceil(Math.max(...pose.map(k => k[0])))
+    yaml.push(`height: ${height}`)
+    yaml.push(`width: ${width}`)
+    yaml.push('skeleton:')
+    const left_hip = pose[mapping['left_hip'][0]]
+    const right_hip = pose[mapping['right_hip'][0]]
+    const root = [(left_hip[0] + right_hip[0]) / 2, (left_hip[1] + right_hip[1]) / 2]
+    for (const name of ['root', 'hip']) {
+        yaml.push(`- loc:`)
+        yaml.push(`  - ${root[0]}`)
+        yaml.push(`  - ${root[1]}`)
+        yaml.push(`  name: ${name}`)
+        yaml.push(`  parent: ${name == 'root' ? 'null' : 'root'}`)
+    }
+    for (const [name, [id, parent]] of Object.entries(mapping)) {
+        const [x, y, score] = pose[id]
+        yaml.push(`- loc:`)
+        yaml.push(`  - ${x}`)
+        yaml.push(`  - ${y}`)
+        yaml.push(`  name: ${name}`)
+        yaml.push(`  parent: ${parent}`)
+    }
+    const string = yaml.join('\n')
+    console.log(string)
+    return new File([string], 'pose.yaml', { type: 'text/yaml' })
+}
+
+async function formFetch(path, data) {
     const formData = new FormData();
-    formData.append("data", file)
-    const response = await fetch(`http://localhost/predictions/${model}`, {
+    for (const [key, value] of Object.entries(data)) {
+        formData.append(key, value)
+    }
+    const response = await fetch(`${backend}/${path}`, {
         method: 'POST',
         body: formData
     });
     return await response.json()
 }
 
-async function getAnimation(file) {
+async function getAnnotation(file) {
     const photo = await fileInputToPng(file)
-    const detections = await formFetch('drawn_humanoid_detector', photo)
-    detections.sort((a, b) => a.score - b.score)
+    const detections = await formFetch('predictions/drawn_humanoid_detector', { data: photo })
+    detections.sort((a, b) => b.score - a.score)
     const figure = await crop(file, detections[0].bbox)
-    const poseResults = await formFetch('drawn_humanoid_pose_estimator', figure)
+    const poseResults = await formFetch('predictions/drawn_humanoid_pose_estimator', { data: figure })
     console.log(poseResults)
     if (poseResults.length != 1) {
         throw `Detected ${poseResults.length} skeletons, expected 1`
     }
+    return { figure, pose: poseResults[0].keypoints }
+}
+
+async function getAnimation(image, pose) {
+    const char_cfg = poseToYaml(pose)
+    const motion_id = 0
+    const animation = await formFetch('render', { motion_id, char_cfg, image })
 }
 
 // returns true if the polyfill was necessary (and an image was captured)
@@ -86,8 +129,8 @@ function polyfillCapture() {
 
 </script>
 </head>
-<body>
-<div class="container flex justify-center" x-data="{ file: null, annotation: null}">
+<body class="flex" x-data="{ file: null, pose: [], figure: null }">
+<div class="container">
     <h1>Animated Drawings</h1>
     <ol>
         <li>
@@ -97,17 +140,25 @@ function polyfillCapture() {
             <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0]" x-init="file = $el.files[0]">
         </li>
         <li x-data="{running: false}">
-            <a href="#" class="btn" @click="!running && !!file && (running = true, annotation = await getAnimation(file), running = false)" :class="{ 'visited': annotation != null, 'inactive': running || !file }">
-                Animovat
+            <a href="#" class="btn" @click="!running && !!file && (running = true, pose = [], {figure, pose} = await getAnnotation(file), running = false)" :class="{ 'visited': pose.length, 'inactive': running || !file }">
+                Detekovat postavu
             </a>
             <img x-show="running" src="../loading.gif" alt="loading" class="aside">
         </li>
         <li>
-            <a href="#" class="btn" x-data="{ active: true }" x-init="active = annotation != null" :class="{ 'inactive': !active }">
-                Stáhnout
+            <a href="#" class="btn" @click="await getAnimation(figure, pose)" :class="{ 'inactive': !pose.length }">
+                Animovat
             </a>
         </li>
     </ol>
+</div>
+<div class="relative">
+    <canvas id="canvas" width="1000" height="1000"></canvas>
+    <div class="absolute" style="top: 0">
+        <template x-for="point in pose">
+            <div class="circle absolute" :style="`top: ${point[1]-5}px; left: ${point[0]-5}px;`">
+        </template>
+    </div>
 </div>
 <div class="footer">
     Meta Research & ZOI ÚTIA 2023

@@ -8,9 +8,10 @@ server {
     send_timeout 1600;
     proxy_read_timeout 1600;
     location / {
-        proxy_pass   http://frontend:3000;
+        root /var/www/html;
+        index index.html;
     }
-    location /prediction {
+    location /predictions {
         proxy_pass   http://backend:8080;
     }
     location /ping {
