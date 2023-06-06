@@ -1,3 +1,4 @@
+version: "3.0"
 services:
   backend:
     build: backend
@@ -20,16 +21,10 @@ services:
         default:
           aliases:
             - proxy
+    volumes:
+      - ./proxy/public:/var/www/html:ro
 
-  frontend:
-    build: frontend
-    ports:
-      - 3000:3000
-    networks:
-        default:
-          aliases:
-            - frontend
-  render: 
+  render:
     build: render
     ports:
       - 8000:8000
