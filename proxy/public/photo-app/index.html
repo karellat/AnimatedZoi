@@ -60,28 +60,37 @@ function crop(file, bbox) {
     });
 }
 
+function avg(a, b) {
+    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+}
+
 function poseToYaml(pose) {
-    const mapping = {'torso': [1, 'hip'], 'neck': [0, 'torso'], 'right_shoulder': [6, 'torso'], 'right_elbow': [8, 'right_shoulder'], 'right_hand': [10, 'right_elbow'], 'left_shoulder': [5, 'torso'], 'left_elbow': [7, 'left_shoulder'], 'left_hand': [9, 'left_elbow'], 'right_hip': [12, 'root'], 'right_knee': [14, 'right_hip'], 'right_foot': [16, 'right_knee'], 'left_hip': [11, 'root'], 'left_knee': [13, 'left_hip'], 'left_foot': [15, 'left_knee']}
+    const skeleton = []
+    skeleton.push([avg(pose[11], pose[12]), 'root', 'null'])
+    skeleton.push([avg(pose[11], pose[12]), 'hip', 'root'])
+    skeleton.push([avg(pose[5], pose[6]), 'torso', 'hip'])
+    skeleton.push([pose[0], 'neck', 'torso'])
+    skeleton.push([pose[6], 'right_shoulder', 'torso'])
+    skeleton.push([pose[8], 'right_elbow', 'right_shoulder'])
+    skeleton.push([pose[10], 'right_hand', 'right_elbow'])
+    skeleton.push([pose[5], 'left_shoulder', 'torso'])
+    skeleton.push([pose[7], 'left_elbow', 'left_shoulder'])
+    skeleton.push([pose[9], 'left_hand', 'left_elbow'])
+    skeleton.push([pose[12], 'right_hip', 'root'])
+    skeleton.push([pose[14], 'right_knee', 'right_hip'])
+    skeleton.push([pose[16], 'right_foot', 'right_knee'])
+    skeleton.push([pose[11], 'left_hip', 'root'])
+    skeleton.push([pose[13], 'left_knee', 'left_hip'])
+    skeleton.push([pose[15], 'left_foot', 'left_knee'])
     const yaml = []
     const canvas = document.querySelector('canvas');
     yaml.push(`height: ${canvas.height}`)
     yaml.push(`width: ${canvas.width}`)
     yaml.push('skeleton:')
-    const left_hip = pose[mapping['left_hip'][0]]
-    const right_hip = pose[mapping['right_hip'][0]]
-    const root = [(left_hip[0] + right_hip[0]) / 2, (left_hip[1] + right_hip[1]) / 2]
-    for (const name of ['root', 'hip']) {
+    for (const [loc, name, parent] of skeleton) {
         yaml.push(`- loc:`)
-        yaml.push(`  - ${root[0]}`)
-        yaml.push(`  - ${root[1]}`)
-        yaml.push(`  name: ${name}`)
-        yaml.push(`  parent: ${name == 'root' ? 'null' : 'root'}`)
-    }
-    for (const [name, [id, parent]] of Object.entries(mapping)) {
-        const [x, y, score] = pose[id]
-        yaml.push(`- loc:`)
-        yaml.push(`  - ${x}`)
-        yaml.push(`  - ${y}`)
+        yaml.push(`  - ${Math.round(loc[0])}`)
+        yaml.push(`  - ${Math.round(loc[1])}`)
         yaml.push(`  name: ${name}`)
         yaml.push(`  parent: ${parent}`)
     }
