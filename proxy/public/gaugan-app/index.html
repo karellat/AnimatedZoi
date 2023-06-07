@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Gaugan 2</title>
+    <link rel="stylesheet" href="../style.css">
+    <script src="../alpine.js" defer></script>
+<script>
+const backend = "http://localhost:5000";
+
+function fileInputToPng(file) {
+    // if the file is image/png, we could return it
+    // but we want to resize it to 1000px
+    if (false && file.type === 'image/png') {
+        return file
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    return new Promise(resolve => {
+        reader.onload = () => {
+            img.src = reader.result;
+            // resize to 1024x1024
+            img.onload = () => {
+                canvas.width = 1024
+                canvas.height = 1024
+                const scale = Math.max(img.width / 1024, img.height / 1024, 1.0);
+                const sx = (img.width - 1024 * scale) / 2;
+                const sy = (img.height - 1024 * scale) / 2;
+                ctx.drawImage(img, sx, sy, canvas.width * scale, canvas.height * scale, 0, 0, canvas.width, canvas.height);
+                // convert to png
+                canvas.toBlob(blob => {
+                    resolve(blob);
+                }, 'image/png');
+            }
+        }
+    });
+}
+
+async function formFetch(file) {
+    const formData = new FormData();
+    formData.append("file", file)
+    const response = await fetch(`${backend}/canvas`, {
+        method: 'POST',
+        body: formData
+    });
+    return await response.blob();
+}
+
+async function getGaugan(file) {
+    const input = await fileInputToPng(file);
+    return await formFetch(input);
+}
+
+function offerDownload(blob) {
+    const a = document.createElement('a');
+    const img = document.querySelector('#preview');
+    a.download = "fotka.png";
+    a.href = URL.createObjectURL(blob);
+    a.dataset.downloadurl = ['image/png', a.download, a.href].join(':');
+    a.style.display = "none";
+    img.src = a.href;
+    a.click();
+    a.remove();    
+}
+
+// returns true if the polyfill was necessary (and an image was captured)
+function polyfillCapture() {
+    return true;
+}
+
+</script>
+</head>
+<body>
+<div class="container flex justify-center" x-data="{ file: null, result: null }">
+    <h1>Gaugan 2</h1>
+    <ol>
+        <li>
+            <label onclick="return polyfillCapture()" for="file-input" class="btn active" :class="{'visited': file != null}">
+                Vyfotit kresbu
+            </label>
+            <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0]" x-init="file = $el.files[0]">
+        </li>
+        <li x-data="{running: false}">
+            <a href="#" class="btn" @click="!running && !!file && (running = true, result = await getGaugan(file), running = false, offerDownload(result))" :class="{ 'visited': result != null, 'inactive': running || !file }">
+                Nakreslit fotografii
+            </a>
+            <img x-show="running" src="../loading.gif" alt="loading" class="aside">
+        </li>
+    </ol>
+    <img x-show="result != null" alt="result" id="preview" @click="offerDownload(result)">
+</div>
+<div class="footer">
+    NVidia AI Research & ZOI ÚTIA 2023
+    <a href="/info">O projektu</a>
+</div>
+</body>
+</html>

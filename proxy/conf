@@ -20,5 +20,7 @@ server {
     location /render {
         proxy_pass http://render:8000;
     }
-
+    location /canvas {
+        proxy_pass http://canvas:5000;
+    }
 }
