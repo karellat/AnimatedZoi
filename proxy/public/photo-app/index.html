@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="../style.css">
     <script src="../alpine.js" defer></script>
 <script>
-const backend = "http://localhost";
+const backend = "";
 
 function fileInputToPng(file) {
     // if the file is image/png, we could return it
@@ -159,7 +159,7 @@ function polyfillCapture() {
             <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0]" x-init="file = $el.files[0]">
         </li>
         <li x-data="{running: false}">
-            <a href="#" class="btn" @click="!running && !!file && (running = true, pose = [], {figure, pose} = await getAnnotation(file), running = false)" :class="{ 'visited': pose.length, 'inactive': running || !file }">
+            <a href="#" class="btn" @click="!running && !!file && (running = true, pose = [], {figure, pose} = await getAnnotation(file), running = false, animation = null)" :class="{ 'visited': pose.length, 'inactive': running || !file }">
                 Detekovat postavu
             </a>
             <img x-show="running" src="../loading.gif" alt="loading" class="aside">

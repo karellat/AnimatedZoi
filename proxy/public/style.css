@@ -65,6 +65,7 @@ body {
 .row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
 }
 .no-decoration {
   text-decoration: none;
@@ -75,16 +76,13 @@ body {
   flex-grow: 1;
 }
 video, img {
-  width: 400px;
-  flex-grow: 1;
+  width: 500px;
 }
 .inline-block {
   display: inline-block;
   max-width: 500px;
 }
-.flex>* {
-  /*! width: min-content; */
-}
+
 .relative {
   position: relative;
 }
