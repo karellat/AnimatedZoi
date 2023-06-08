@@ -1,6 +1,6 @@
 filepath: ./config/bvh/fair1/jumping.bvh
-start_frame_idx: 150
-end_frame_idx: 654 
+start_frame_idx: 250
+end_frame_idx: 500 
 groundplane_joint: LeftFoot
 forward_perp_joint_vectors:
   - - LeftShoulder

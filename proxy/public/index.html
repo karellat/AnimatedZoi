@@ -2,36 +2,191 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Předváděcí aplikace zpracování obrazu</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Animated Drawings</title>
+    <link rel="stylesheet" href="../style.css">
+    <script src="../alpine.js" defer></script>
+<script>
+
+function getRandomInt(max) {
+  return Math.floor(Math.random() * max);
+}
+
+function fileInputToPng(file) {
+    // if the file is image/png, we could return it
+    // but we want to resize it to 1000px
+    if (false && file.type === 'image/png') {
+        return file
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    const canvas = document.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    return new Promise(resolve => {
+        reader.onload = () => {
+            img.src = reader.result;
+            // resize to 1000px
+            img.onload = () => {
+                canvas.width = Math.min(1000, img.width, 1000 * img.width / img.height)
+                canvas.height = Math.min(1000, img.height, 1000 * img.height / img.width)
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                // convert to png
+                canvas.toBlob(blob => {
+                    resolve(blob);
+                }, 'image/png');
+            }
+        }
+    });
+}
+
+function crop(file, bbox) {
+    const [l, t, r, b] = bbox;
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    const canvas = document.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    return new Promise(resolve => {
+        reader.onload = () => {
+            img.src = reader.result;
+            img.onload = () => {
+                canvas.width = r - l
+                canvas.height = b - t
+                const scale = Math.max(img.width / 1000, img.height / 1000, 1.0);
+                ctx.drawImage(img, l * scale, t * scale, canvas.width * scale, canvas.height * scale, 0, 0, canvas.width, canvas.height);
+                // convert to png
+                canvas.toBlob(blob => {
+                    resolve(blob);
+                }, 'image/png');
+            }
+        }
+    });
+}
+
+function avg(a, b) {
+    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+}
+
+function poseToYaml(pose) {
+    const skeleton = []
+    skeleton.push([avg(pose[11], pose[12]), 'root', 'null'])
+    skeleton.push([avg(pose[11], pose[12]), 'hip', 'root'])
+    skeleton.push([avg(pose[5], pose[6]), 'torso', 'hip'])
+    skeleton.push([pose[0], 'neck', 'torso'])
+    skeleton.push([pose[6], 'right_shoulder', 'torso'])
+    skeleton.push([pose[8], 'right_elbow', 'right_shoulder'])
+    skeleton.push([pose[10], 'right_hand', 'right_elbow'])
+    skeleton.push([pose[5], 'left_shoulder', 'torso'])
+    skeleton.push([pose[7], 'left_elbow', 'left_shoulder'])
+    skeleton.push([pose[9], 'left_hand', 'left_elbow'])
+    skeleton.push([pose[12], 'right_hip', 'root'])
+    skeleton.push([pose[14], 'right_knee', 'right_hip'])
+    skeleton.push([pose[16], 'right_foot', 'right_knee'])
+    skeleton.push([pose[11], 'left_hip', 'root'])
+    skeleton.push([pose[13], 'left_knee', 'left_hip'])
+    skeleton.push([pose[15], 'left_foot', 'left_knee'])
+    const yaml = []
+    const canvas = document.querySelector('canvas');
+    yaml.push(`height: ${canvas.height}`)
+    yaml.push(`width: ${canvas.width}`)
+    yaml.push('skeleton:')
+    for (const [loc, name, parent] of skeleton) {
+        yaml.push(`- loc:`)
+        yaml.push(`  - ${Math.round(loc[0])}`)
+        yaml.push(`  - ${Math.round(loc[1])}`)
+        yaml.push(`  name: ${name}`)
+        yaml.push(`  parent: ${parent}`)
+    }
+    const string = yaml.join('\n')
+    return new File([string], 'pose.yaml', { type: 'text/yaml' })
+}
+
+async function formFetch(path, data, isJson=true) {
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(data)) {
+        formData.append(key, value)
+    }
+    const response = await fetch(`${path}`, {
+        method: 'POST',
+        body: formData
+    });    
+    return isJson ? (await response.json()) : response;
+}
+
+async function getAnnotation(file) {
+    const photo = await fileInputToPng(file)
+    const detections = await formFetch('/predictions/drawn_humanoid_detector', { data: photo })
+    detections.sort((a, b) => b.score - a.score)
+    const figure = await crop(file, detections[0].bbox)
+    const poseResults = await formFetch('/predictions/drawn_humanoid_pose_estimator', { data: figure })
+    if (poseResults.length != 1) {
+        throw `Detected ${poseResults.length} skeletons, expected 1`
+    }
+    return { figure, pose: poseResults[0].keypoints }
+}
+
+async function getAnimation(image, pose) {
+    const char_cfg = poseToYaml(pose)
+    const motion_id = getRandomInt(4)
+    const response = await formFetch('/render', { motion_id, char_cfg, image }, false)
+    return await response.blob()
+}
+
+function offerDownload(blob) {
+    const a = document.createElement('a');
+    const img = document.querySelector('#preview');
+    a.download = "animace.gif";
+    a.href = URL.createObjectURL(blob);
+    a.dataset.downloadurl = ['image/gif', a.download, a.href].join(':');
+    a.style.display = "none";
+    img.src = a.href;
+    a.click();
+    a.remove();    
+}
+
+// returns true if the polyfill was necessary (and an image was captured)
+function polyfillCapture() {
+    return true;
+}
+
+</script>
 </head>
-<body>
-    <div class="container flex justify-center">
-        <h1>Předváděcí aplikace zpracování obrazu</h1>
-        <a href="/photo-app" class="no-decoration row">
-            <div class="padding">
-                <h2>Animated Drawings</h2>
-                <p>
-                    Vyfoťte postavičku nakreslenou na papíře a sledujte, jak před vámi začne tančit.
-                    Aplikace byla vytvořena firmou Meta Research v roce 2023.
-                </p>
-            </div>
-            <video height="400" loop autoplay>
-                <source src="jesse_dance.mp4" type="video/mp4">
-                Your browser does not support the video tag.
-            </video>
-        </a>
-        
-        <a href="/gaugan-app" class="no-decoration">
-            <div class="padding inline-block">
-                <h2>Gaugan 2</h2>
-                <p>
-                    Načrtněte barevnými fixy krajinku a aplikace vám vygeneruje fotorealistický obrázek.
-                    Aplikace byla vytvořena firmou NVIDIA v roce 2021.
-                </p>
-            </div>
-            <img src="gaugan.webp" alt="Gaugan">
-        </a>
+<body class="flex" x-data="{ file: null, pose: [], figure: null, animation: null }">
+<div class="container">
+    <h1>Animated Drawings</h1>
+    <ol>
+        <li>
+            <label onclick="return polyfillCapture()" for="file-input" class="btn active" :class="{'visited': file != null}">
+                Získat fotografii
+            </label>
+            <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0]" x-init="file = $el.files[0]">
+        </li>
+        <li x-data="{running: false}">
+            <a href="#" class="btn" @click="!running && !!file && (running = true, pose = [], {figure, pose} = await getAnnotation(file), running = false, animation = null)" :class="{ 'visited': pose.length, 'inactive': running || !file }">
+                Detekovat postavu
+            </a>
+            <img x-show="running" src="../loading.gif" alt="loading" class="aside">
+        </li>
+        <li x-data="{running: false}">
+            <a href="#" class="btn" @click="!running && !!file && (running = true, animation = await getAnimation(figure, pose), running=false, offerDownload(animation))" :class="{ 'inactive': running || !pose.length }">
+                Animovat
+            </a>
+            <img x-show="running" src="../loading.gif" alt="loading" class="aside">
+        </li>
+    </ol>
+</div>
+<img x-show="animation != null" alt="animace" id="preview" @click="offerDownload(animation)">
+<div class="relative" x-show="animation == null">
+    <canvas id="canvas" width="1000" height="1000"></canvas>
+    <div class="absolute" style="top: 0">
+        <template x-for="point in pose">
+            <div class="circle absolute" :style="`top: ${point[1]-5}px; left: ${point[0]-5}px;`">
+        </template>
     </div>
+</div>
+<div class="footer">
+    Meta Research & ZOI ÚTIA 2023
+    <a href="/info">O projektu</a>
+</div>
 </body>
 </html>

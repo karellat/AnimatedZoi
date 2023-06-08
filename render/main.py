@@ -92,6 +92,7 @@ def select_random_motion_cfg(fixed_id: Optional[int]=None):
         for file in files:
             file_paths.append(os.path.join(root, file))
 
+    file_paths = sorted(file_paths)
     if fixed_id:
         assert fixed_id < len(file_paths) and fixed_id > 0
         return file_paths[fixed_id]
