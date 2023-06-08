@@ -2,9 +2,10 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Animated Drawings</title>
-    <link rel="stylesheet" href="../style.css">
-    <script src="../alpine.js" defer></script>
+    <link rel="stylesheet" href="./style.css">
+    <script src="./alpine.js" defer></script>
 <script>
 
 function getRandomInt(max) {
@@ -109,12 +110,11 @@ async function formFetch(path, data, isJson=true) {
     const response = await fetch(`${path}`, {
         method: 'POST',
         body: formData
-    });    
+    });
     return isJson ? (await response.json()) : response;
 }
 
-async function getAnnotation(file) {
-    const photo = await fileInputToPng(file)
+async function getAnnotation(file, photo) {
     const detections = await formFetch('/predictions/drawn_humanoid_detector', { data: photo })
     detections.sort((a, b) => b.score - a.score)
     const figure = await crop(file, detections[0].bbox)
@@ -141,7 +141,7 @@ function offerDownload(blob) {
     a.style.display = "none";
     img.src = a.href;
     a.click();
-    a.remove();    
+    a.remove();
 }
 
 // returns true if the polyfill was necessary (and an image was captured)
@@ -151,42 +151,41 @@ function polyfillCapture() {
 
 </script>
 </head>
-<body class="flex" x-data="{ file: null, pose: [], figure: null, animation: null }">
-<div class="container">
-    <h1>Animated Drawings</h1>
-    <ol>
-        <li>
+<body x-data="{ file: null, photo: null, pose: [], figure: null, animation: null, loading: false }">
+    <div class="container">
+        <h1 class="title">Animated Drawings</h1>
+        <div class="step">
             <label onclick="return polyfillCapture()" for="file-input" class="btn active" :class="{'visited': file != null}">
                 Získat fotografii
             </label>
-            <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0]" x-init="file = $el.files[0]">
-        </li>
-        <li x-data="{running: false}">
-            <a href="#" class="btn" @click="!running && !!file && (running = true, pose = [], {figure, pose} = await getAnnotation(file), running = false, animation = null)" :class="{ 'visited': pose.length, 'inactive': running || !file }">
+            <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0], photo = await fileInputToPng(file)" x-init="file = $el.files[0]">
+        </div>
+        <div class="step" x-data="{running: false}">
+            <a href="#" class="btn" @click="!running && !!file && !!photo && (running = true, loading = true, pose = [], {figure, pose} = await getAnnotation(file, photo), running = false, animation = null, loading = false)" :class="{ 'visited': pose.length, 'inactive': running || !file }">
                 Detekovat postavu
             </a>
-            <img x-show="running" src="../loading.gif" alt="loading" class="aside">
-        </li>
-        <li x-data="{running: false}">
-            <a href="#" class="btn" @click="!running && !!file && (running = true, animation = await getAnimation(figure, pose), running=false, offerDownload(animation))" :class="{ 'inactive': running || !pose.length }">
+        </div>
+        <div class="step" x-data="{running: false}">
+            <a href="#" class="btn" @click="!running && !!file && (running = true, loading = true, animation = await getAnimation(figure, pose), running = false, loading = false, offerDownload(animation))" :class="{ 'inactive': running || !pose.length }">
                 Animovat
             </a>
-            <img x-show="running" src="../loading.gif" alt="loading" class="aside">
-        </li>
-    </ol>
-</div>
-<img x-show="animation != null" alt="animace" id="preview" @click="offerDownload(animation)">
-<div class="relative" x-show="animation == null">
-    <canvas id="canvas" width="1000" height="1000"></canvas>
-    <div class="absolute" style="top: 0">
-        <template x-for="point in pose">
-            <div class="circle absolute" :style="`top: ${point[1]-5}px; left: ${point[0]-5}px;`">
-        </template>
+        </div>
+        <div class="canvas-wrapper" x-show="animation == null">
+            <canvas class="canvas" id="canvas"></canvas>
+            <div class="pose" style="top: 0">
+                <template x-for="point in pose">
+                    <div class="circle" :style="`top: ${point[1]-5}px; left: ${point[0]-5}px;`">
+                </template>
+            </div>
+            <div class="loading" x-show="loading">
+                <img src="./loading.svg" alt="loading" class="spinner">
+            </div>
+        </div>
+        <img class="animation" x-show="animation != null" alt="animace" id="preview" @click="offerDownload(animation)">
+        <div class="footer">
+            Meta Research & ZOI ÚTIA 2023
+            <a href="/info">O projektu</a>
+        </div>
     </div>
-</div>
-<div class="footer">
-    Meta Research & ZOI ÚTIA 2023
-    <a href="/info">O projektu</a>
-</div>
 </body>
 </html>
