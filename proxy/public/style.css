@@ -6,8 +6,8 @@
 }
 .btn {
   display: inline-block;
-  width: 30rem;
-  max-width: calc(100% - 5rem);
+  width: 80%;
+  max-width: calc(100% - 2rem);
   background-color: #0968CE;
   box-sizing: border-box;
   color: white;
