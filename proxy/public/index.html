@@ -163,7 +163,7 @@ function polyfillCapture() {
             <label onclick="return polyfillCapture()" for="file-input" class="btn active" :class="{'visited': file != null}">
                 Získat fotografii
             </label>
-            <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0], photo = await fileInputToPng(file)" x-init="file = $el.files[0]">
+            <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0], photo = await fileInputToPng(file), pose = [], figure = null, animation = null" x-init="file = $el.files[0]">
         </div>
         <div class="step" x-data="{running: false}">
             <a href="#" class="btn" @click="!running && !!file && !!photo && (running = true, loading = true, pose = [], {figure, pose} = await getAnnotation(file, photo), poseScale = getPoseScale(), running = false, animation = null, loading = false)" :class="{ 'visited': pose.length, 'inactive': running || !file }">

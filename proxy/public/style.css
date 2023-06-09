@@ -61,7 +61,6 @@ body {
 .canvas-wrapper {
   margin-top: 1rem;
   position: relative;
-  width: 100%;
 }
 
 .canvas {
