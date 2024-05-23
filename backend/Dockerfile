@@ -18,12 +18,12 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # install python dependencies
+RUN conda install python=3.10
 RUN pip install openmim
-RUN pip install torch
-RUN mim install mmcv-full==1.7.0
+RUN pip install torch==1.13.1 torchvision==0.14.1 torchserve==0.8.1
+RUN pip install mmcv-full==1.7.0
 RUN pip install mmpose==0.29.0
 RUN pip install mmdet==2.27.0
-RUN pip install torchserve
 
 # prep torchserve
 RUN mkdir -p /home/torchserve/model-store
