@@ -1,7 +1,12 @@
-run: 
-	sudo docker container prune -f
-	sudo docker image prune --all -f
-	sudo docker-compose up --remove-orphans --build --no-deps
+run:
+	docker-compose up --remove-orphans --build --no-deps
+
+stop:
+	docker container prune -f
+
+clean:
+	docker image prune --all -f
+
 test:
 	curl http://localhost/predictions/drawn_humanoid_detector -F "data=@example/zoi.jpg" -o example/box.json
 	python example/crop.py example/box.json example/zoi.jpg example/crop.png

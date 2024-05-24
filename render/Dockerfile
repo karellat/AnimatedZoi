@@ -11,6 +11,8 @@ RUN export TZ=Europe/Prague && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime &&
 # FastAPI
 RUN apt-get install -y python3.10 python3-pip ffmpeg libsm6 libxext6 git && pip install --no-cache-dir --upgrade -r /code/requirements.txt
 RUN git clone https://github.com/facebookresearch/AnimatedDrawings.git && cd AnimatedDrawings && pip3 install -e .
+#COPY ./AnimatedDrawings/ /code/AnimatedDrawings/
+#RUN cd AnimatedDrawings && pip3 install -e .
 # Animated drawings 
 # Install OpenGL
 RUN apt-get install -y cmake pkg-config mesa-utils libglu1-mesa-dev freeglut3-dev mesa-common-dev libglew-dev libglfw3-dev libglm-dev libao-dev libmpg123-dev
