@@ -40,16 +40,29 @@ function fileInputToPng(file) {
     });
 }
 
-function crop(file, bbox) {
+function grabCam(){
+  const canvas = document.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = Math.min(1000, video.width, 1000 * video.width / video.height)
+  canvas.height = Math.min(1000, video.height, 1000 * video.height / video.width)
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  // convert to png
+  return new Promise(resolve => {
+    canvas.toBlob(blob => {
+      resolve(blob);
+  }, 'image/png');
+  });
+}
+
+function crop(photo, bbox) {
     const [l, t, r, b] = bbox;
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
     const canvas = document.querySelector('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
+    const photoURL = URL.createObjectURL(photo);
     return new Promise(resolve => {
-        reader.onload = () => {
-            img.src = reader.result;
+            img.src = photoURL;
             img.onload = () => {
                 canvas.width = r - l
                 canvas.height = b - t
@@ -60,7 +73,6 @@ function crop(file, bbox) {
                     resolve(blob);
                 }, 'image/png');
             }
-        }
     });
 }
 
@@ -114,10 +126,10 @@ async function formFetch(path, data, isJson=true) {
     return isJson ? (await response.json()) : response;
 }
 
-async function getAnnotation(file, photo) {
+async function getAnnotation(photo) {
     const detections = await formFetch('/predictions/drawn_humanoid_detector', { data: photo })
     detections.sort((a, b) => b.score - a.score)
-    const figure = await crop(file, detections[0].bbox)
+    const figure = await crop(photo, detections[0].bbox)
     const poseResults = await formFetch('/predictions/drawn_humanoid_pose_estimator', { data: figure })
     if (poseResults.length != 1) {
         throw `Detected ${poseResults.length} skeletons, expected 1`
@@ -154,28 +166,43 @@ function polyfillCapture() {
     return true;
 }
 
+navigator.mediaDevices.getUserMedia({ video: true })
+    .then(function(stream) {
+        const video = document.getElementById('video');
+        video.srcObject = stream;
+    })
+    .catch(function(error) {
+        console.error('Přístup ke kameře byl odepřen:', error);
+    });
+
 </script>
 </head>
-<body x-data="{ file: null, photo: null, pose: [], figure: null, animation: null, loading: false, poseScale: null}">
+<body x-data="{ file: null, photo: null, pose: [], figure: null, animation: null, loading: false, poseScale: null, showCam: false}">
     <div class="container">
         <h1 class="title">Animated Drawings</h1>
         <div class="step">
             <label onclick="return polyfillCapture()" for="file-input" class="btn active" :class="{'visited': file != null}">
-                Získat fotografii
+                Nahrát fotografii
             </label>
-            <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0], photo = await fileInputToPng(file), pose = [], figure = null, animation = null" x-init="file = $el.files[0]">
+            <input type="file" accept="image/*" class="hidden" capture="environment" id="file-input" @change="file = $el.files[0],  showCam=false, photo = await fileInputToPng(file), pose = [], figure = null, animation = null" x-init="file = $el.files[0]">
+        </div>
+        <div class="step">
+          <a href="#" class="btn" @click="( (showCam && (photo = await grabCam(), true)), (!showCam &&( photo = null, pose = [], figure = null, animation = null ,true)),showCam=!showCam)">
+            <span x-show="!showCam">Aktivovat kameru</span>
+            <span x-show="showCam">Pořídit snímek</span>
+          </a>
         </div>
         <div class="step" x-data="{running: false}">
-            <a href="#" class="btn" @click="!running && !!file && !!photo && (running = true, loading = true, pose = [], {figure, pose} = await getAnnotation(file, photo), poseScale = getPoseScale(), running = false, animation = null, loading = false)" :class="{ 'visited': pose.length, 'inactive': running || !file }">
+            <a href="#" class="btn" @click="!running && !!photo && (running = true, loading = true, pose = [], {figure, pose} = await getAnnotation(photo), poseScale = getPoseScale(), running = false, animation = null, loading = false)" :class="{ 'visited': pose.length, 'inactive': running || !photo }">
                 Detekovat postavu
             </a>
         </div>
         <div class="step" x-data="{running: false}">
-            <a href="#" class="btn" @click="!running && !!file && (running = true, loading = true, animation = await getAnimation(figure, pose), running = false, loading = false, offerDownload(animation))" :class="{ 'inactive': running || !pose.length }">
+            <a href="#" class="btn" @click="!running && !!photo && (running = true, loading = true, animation = await getAnimation(figure, pose), running = false, loading = false, offerDownload(animation))" :class="{ 'inactive': running || !pose.length }">
                 Animovat
             </a>
         </div>
-        <div class="canvas-wrapper" x-show="animation == null">
+        <div class="canvas-wrapper" x-show="animation == null && !showCam">
             <canvas class="canvas" id="canvas"></canvas>
             <div  x-on:resize.window="poseScale = getPoseScale()" class="pose" style="top: 0">
                 <template x-for="point in pose">
@@ -187,6 +214,7 @@ function polyfillCapture() {
             </div>
         </div>
         <img class="animation" x-show="animation != null" alt="animace" id="preview" @click="offerDownload(animation)">
+        <video id="video" width="640" height="480" autoplay x-show=showCam></video>
         <div class="footer">
             Meta Research & ZOI ÚTIA 2023
             <a href="/info">O projektu</a>
