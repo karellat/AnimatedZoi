@@ -15,14 +15,14 @@ services:
     restart: always
     ports:
       - 80:80
-    depends_on: 
+    depends_on:
       - backend
     networks:
         default:
           aliases:
             - proxy
-    volumes:
-      - ./proxy/public:/var/www/html:ro
+#    volumes:
+#      - ./proxy/public:/var/www/html:ro
 
   render:
     build: render

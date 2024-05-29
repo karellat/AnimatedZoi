@@ -19,8 +19,13 @@ RUN apt-get update && \
 
 # install python dependencies
 RUN conda install python=3.10
+
+#ENV FORCE_CUDA="1"
+#ENV MCCV_WITH_OPS=1
+
 RUN pip install openmim
-RUN pip install torch==1.13.1 torchvision==0.14.1 torchserve==0.8.1
+RUN pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+RUN pip install torchserve==0.8.1
 RUN pip install mmcv-full==1.7.0
 RUN pip install mmpose==0.29.0
 RUN pip install mmdet==2.27.0
@@ -30,8 +35,9 @@ RUN mkdir -p /home/torchserve/model-store
 RUN wget https://github.com/facebookresearch/AnimatedDrawings/releases/download/v0.0.1/drawn_humanoid_detector.mar -P /home/torchserve/model-store/
 RUN wget https://github.com/facebookresearch/AnimatedDrawings/releases/download/v0.0.1/drawn_humanoid_pose_estimator.mar -P /home/torchserve/model-store/
 COPY config.properties /home/torchserve/config.properties
+COPY start.sh /home/torchserve/
 
 EXPOSE 8080
 EXPOSE 8081
 # starting command
-CMD /opt/conda/bin/torchserve --start --ts-config /home/torchserve/config.properties && sleep infinity
+CMD /home/torchserve/start.sh
