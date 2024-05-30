@@ -1,2 +1,1 @@
 # AnimatedZoi
-* test protection
